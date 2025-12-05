@@ -85,6 +85,17 @@ typedef struct {
     long high;
 } range;
 
+int rangecmp(const void *a_raw, const void *b_raw) {
+    range a = *(range *)a_raw;
+    range b = *(range *)b_raw;
+
+    if (a.low != b.low) {
+        return (a.low - b.low) / labs(a.low - b.low);
+    }
+
+    return (a.high - b.high) / labs(a.high - b.high);
+}
+
 int main() {
     int ranges_capacity = 1;
     int ranges_length = 0;
@@ -127,18 +138,24 @@ int main() {
 
     free(line.data);
 
-    int num_fresh = 0;
+    qsort(ranges, ranges_length, sizeof(range), rangecmp);
 
-    for (int i = 0; i < ingredients_length; i++) {
-        for (int j = 0; j < ranges_length; j++) {
-            if (ranges[j].low <= ingredients[i] && ranges[j].high >= ingredients[i]) {
-                num_fresh++;
-                break;
-            }
+    long num_fresh = 0;
+
+    range current_range = ranges[0];
+
+    for (int i = 0; i < ranges_length; i++) {
+        if (ranges[i].low > current_range.high + 1) {
+            num_fresh += current_range.high - current_range.low + 1;
+            current_range = ranges[i];
+        } else if (ranges[i].high > current_range.high) {
+            current_range.high = ranges[i].high;
         }
     }
 
-    printf("%d\n", num_fresh);
+    num_fresh += current_range.high - current_range.low + 1;
+
+    printf("%ld\n", num_fresh);
 
     free(ranges);
     free(ingredients);
