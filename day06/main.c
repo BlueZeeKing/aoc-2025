@@ -74,100 +74,97 @@ str_ref split_iter_next(split_iter *iter) {
     return return_value;
 }
 
-str_ref readline() {
-    int capacity = 1;
+str_ref readfile(FILE *fp) {
+    int capacity = 1024;
     str_ref str = { malloc(capacity), 0 };
-    char c;
-    while ((c = getc(stdin)) != '\n' && c != EOF) {
-        if (capacity == str.length) {
+    char buffer[1024];
+    int amount_read;
+    while ((amount_read = fread(&buffer, 1, 1024, fp)) != 0) {
+        if (str.length == capacity) {
             capacity *= 2;
             str.data = realloc(str.data, capacity);
         }
-        str.data[str.length++] = c;
+        memcpy(str.data + str.length, &buffer, amount_read);
+        str.length += amount_read;
     }
+
     return str;
 }
 
-int main() {
-    str_ref line = readline();
-    assert(!strisempty(line));
-
-    int width = -1;
-
-    int height_capacity = 1;
-    int height = 0;
-    int64_t **problems = malloc(sizeof(int64_t *) * height_capacity);
-
-    char *ops = NULL;
-
-    while (!strisempty(line)) {
-        split_iter iter = split_iter_new(line, ' ');
-
-        int width_capacity = 1;
-        int current_width = 0;
-        if (width != -1) {
-            width_capacity = width;
-        }
-        int64_t *parsed_line = malloc(sizeof(int64_t) * width_capacity);
-
-        bool is_ops = false;
-
-        str_ref part = split_iter_next(&iter);
-        while (!strisempty(part)) {
-            if (current_width == width_capacity) {
-                width_capacity *= 2;
-                parsed_line = realloc(parsed_line, sizeof(int64_t) * width_capacity);
-            }
-            if (isdigit(part.data[0])) {
-                parsed_line[current_width++] = strtonum(part);
-            } else {
-                is_ops = true;
-                if (ops == NULL) {
-                    ops = malloc(sizeof(char) * width);
-                }
-                ops[current_width++] = part.data[0];
-            }
-
-            part = split_iter_next(&iter);
-        }
-
-        if (is_ops) {
-            break;
-        }
-
-        if (width == -1) {
-            width = current_width;
-        }
-        assert(width == current_width);
-
-        if (height == height_capacity) {
-            height_capacity *= 2;
-            problems = realloc(problems, sizeof(int64_t *) * height_capacity);
-        }
-        problems[height++] = parsed_line;
-
-        free(line.data);
-        line = readline();
+int64_t split_iter_count(split_iter iter) {
+    int64_t count = 0;
+    while (!strisempty(split_iter_next(&iter))) {
+        count++;
     }
-    free(line.data);
+    return count;
+}
+
+str_ref split_iter_get(split_iter iter, int64_t idx) {
+    while (idx-- > 0) {
+        split_iter_next(&iter);
+    }
+    return split_iter_next(&iter);
+}
+
+int main() {
+    str_ref file = readfile(stdin);
+    assert(!strisempty(file));
+
+    split_iter lines = split_iter_new(file, '\n');
+
+    int64_t height = split_iter_count(lines) - 1;
+
+    split_iter ops_iter = split_iter_new(split_iter_get(lines, height), ' ');
+    int line_width = ops_iter.str.length;
+    char* initial_ptr = ops_iter.str.data;
+    int64_t width = split_iter_count(ops_iter);
+    char *ops = malloc(width);
+    int64_t *offsets = malloc(width * sizeof(int64_t));
+    int64_t *lengths = malloc(width * sizeof(int64_t));
+
+    for (int i = 0; i < width; i++) {
+        str_ref op = split_iter_next(&ops_iter);
+        ops[i] = op.data[0];
+        offsets[i] = op.data - initial_ptr;
+        if (i != 0) {
+            lengths[i - 1] = offsets[i] - offsets[i - 1] - 1;
+        }
+    }
+    lengths[width - 1] = line_width - offsets[width - 1];
 
     int64_t sum = 0;
 
     for (int x = 0; x < width; x++) {
         char op = ops[x];
-        int64_t value = 0;
+        int64_t result = 0;
         if (op == '*') {
-            value = 1;
+            result = 1;
         }
-        for (int y = 0; y < height; y++) {
+
+        for (int x_inner = 0; x_inner < lengths[x]; x_inner++) {
+            int64_t value = 0;
+            for (int y = 0; y < height; y++) {
+                char digit = split_iter_next(&lines).data[x_inner + offsets[x]];
+                if (digit == ' ') {
+                    continue;
+                }
+                value *= 10;
+                value += digit - '0';
+            }
+            lines = split_iter_new(file, '\n');
+
             if (op == '*') {
-                value *= problems[y][x];
+                result *= value;
             } else {
-                value += problems[y][x];
+                result += value;
             }
         }
-        sum += value;
+
+
+        sum += result;
     }
+
+    free(file.data);
 
     printf("sum: %ld\n", sum);
 }
