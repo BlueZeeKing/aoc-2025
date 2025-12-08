@@ -134,33 +134,36 @@ int main() {
 
     assert(length == width * height);
 
-    bool *has_beam = malloc(sizeof(bool) * width);
-    memset(has_beam, 0, sizeof(bool) * width);
-    has_beam[start_x] = true;
-    bool *next_has_beam = malloc(sizeof(bool) * width);
-
-    int num_splits = 0;
+    long *num_beams = malloc(sizeof(long) * width);
+    memset(num_beams, 0, sizeof(long) * width);
+    num_beams[start_x] = true;
+    long *next_num_beams = malloc(sizeof(long) * width);
 
     for (int y = 0; y < height; y++) {
-        memset(next_has_beam, 0, sizeof(bool) * width);
+        memset(next_num_beams, 0, sizeof(long) * width);
         for (int x = 0; x < width; x++) {
-            if (has_beam[x] && !is_splitter[x + y * width]) {
-                next_has_beam[x] = true;
-            } else if (has_beam[x] && is_splitter[x + y * width]) {
-                num_splits++;
+            if (!is_splitter[x + y * width]) {
+                next_num_beams[x] += num_beams[x];
+            } else if (is_splitter[x + y * width]) {
                 if (x > 0) {
-                    next_has_beam[x - 1] = true;
+                    next_num_beams[x - 1] += num_beams[x];
                 }
                 if (x < width - 1) {
-                    next_has_beam[x + 1] = true;
+                    next_num_beams[x + 1] += num_beams[x];
                 }
             }
         }
 
-        bool *temp = has_beam;
-        has_beam = next_has_beam;
-        next_has_beam = temp;
+        long *temp = num_beams;
+        num_beams = next_num_beams;
+        next_num_beams = temp;
+    }
+    
+    long sum = 0;
+
+    for (int x = 0; x < width; x++) { 
+        sum += num_beams[x];
     }
 
-    printf("%d\n", num_splits);
+    printf("%ld\n", sum);
 }
