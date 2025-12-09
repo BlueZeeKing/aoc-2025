@@ -214,26 +214,10 @@ long find_next_group(connection connections[NUM_CONNECTIONS], bool *visited, int
     return found;
 }
 
-bool is_already_connected(connection connections[NUM_CONNECTIONS], int connection_length, bool *visited, int length, int start, int end) {
-    memset(visited, 0, sizeof(bool) * length);
-    queue queue = queue_new();
-    queue_push(&queue, start);
-    visited[start] = true;
-
-    while (!queue_is_empty(&queue)) {
-        int next_idx = queue_pop(&queue);
-        if (next_idx == end) {
+bool is_already_used(connection *connections, int i, int j, int k) {
+    for (int l = 0; l < i; l++) {
+        if (j == connections[l].a_idx && k == connections[l].b_idx) {
             return true;
-        }
-
-        for (int i = 0; i < connection_length; i++) {
-            if (connections[i].a_idx == next_idx && !visited[connections[i].b_idx])  {
-                queue_push(&queue, connections[i].b_idx);
-                visited[connections[i].b_idx] = true;
-            } else if (connections[i].b_idx == next_idx && !visited[connections[i].a_idx])  {
-                queue_push(&queue, connections[i].a_idx);
-                visited[connections[i].a_idx] = true;
-            }
         }
     }
 
@@ -263,18 +247,13 @@ int main() {
     connection connections[NUM_CONNECTIONS] = {};
     bool *visited = malloc(sizeof(bool) * length);
 
+    bool *connection_set = malloc(sizeof(bool) * length * length);
+
     for (int i = 0; i < NUM_CONNECTIONS; i++) {
         double min_dist = DBL_MAX;
         for (int j = 0; j < length - 1; j++) {
             for (int k = j + 1; k < length; k++) {
-                bool already_used = false;
-                for (int l = 0; l < i; l++) {
-                    if (j == connections[l].a_idx && k == connections[l].b_idx) {
-                        already_used = true;
-                        break;
-                    }
-                }
-                if (already_used) {
+                if (connection_set[j + k * length]) {
                     continue;
                 }
 
@@ -291,6 +270,7 @@ int main() {
                 }
             }
         }
+        connection_set[connections[i].a_idx + connections[i].b_idx * length] = true;
 
         printf("%d - %d to %d dist: %f\n", i, connections[i].a_idx,
                connections[i].b_idx, min_dist);
@@ -316,7 +296,7 @@ int main() {
         } else if (found > max3) {
             max3 = found;
         }
-        printf("found: %ld\n", found);
+        // printf("found: %ld\n", found);
     } while (found != 0);
 
     printf("product: %ld\n", max1 * max2 * max3);
