@@ -111,14 +111,11 @@ str_ref split_iter_get(split_iter iter, int64_t idx) {
     return split_iter_next(&iter);
 }
 
-#define NUM_CONNECTIONS (1000)
-
 typedef struct {
     long x, y, z;
 } point;
 
 typedef struct {
-    point a, b;
     int a_idx, b_idx;
 } connection;
 
@@ -176,42 +173,33 @@ bool queue_is_empty(queue *queue) {
     return queue->head == NULL;
 }
 
-long find_next_group(connection connections[NUM_CONNECTIONS], bool *visited, int length) {
-    int initial = -1;
-    for (int i = 0; i < length; i++) {
-        if (!visited[i]) {
-            initial = i;
-            break;
-        }
-    }
-
-    if (initial == -1) {
-        return 0;
-    }
-
+bool is_connected(connection *connections, int connections_length, bool *visited, int length) {
+    memset(visited, 0, sizeof(bool) * length);
     queue queue = queue_new();
-    queue_push(&queue, initial);
-    visited[initial] = true;
-
-    long found = 1;
+    queue_push(&queue, 0);
+    visited[0] = true;
 
     while (!queue_is_empty(&queue)) {
         int next_idx = queue_pop(&queue);
 
-        for (int i = 0; i < NUM_CONNECTIONS; i++) {
+        for (int i = 0; i < connections_length; i++) {
             if (connections[i].a_idx == next_idx && !visited[connections[i].b_idx])  {
                 queue_push(&queue, connections[i].b_idx);
                 visited[connections[i].b_idx] = true;
-                found++;
             } else if (connections[i].b_idx == next_idx && !visited[connections[i].a_idx])  {
                 queue_push(&queue, connections[i].a_idx);
                 visited[connections[i].a_idx] = true;
-                found++;
             }
         }
     }
 
-    return found;
+    for (int i = 0; i < length; i++) {
+        if (!visited[i]) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool is_already_used(connection *connections, int i, int j, int k) {
@@ -244,12 +232,20 @@ int main() {
         length++;
     }
 
-    connection connections[NUM_CONNECTIONS] = {};
+    int connections_capacity = 1, connections_length = 0;
+    connection *connections = malloc(sizeof(connection) * connections_capacity);
     bool *visited = malloc(sizeof(bool) * length);
 
     bool *connection_set = malloc(sizeof(bool) * length * length);
 
-    for (int i = 0; i < NUM_CONNECTIONS; i++) {
+    int prev_x1 = 0;
+    int prev_x2 = 0;
+
+    while (connections_length == 0 || !is_connected(connections, connections_length, visited, length)) {
+        if (connections_length == connections_capacity) {
+            connections_capacity *= 2;
+            connections = realloc(connections, connections_capacity * sizeof(connection));
+        }
         double min_dist = DBL_MAX;
         for (int j = 0; j < length - 1; j++) {
             for (int k = j + 1; k < length; k++) {
@@ -263,41 +259,17 @@ int main() {
 
                 if (dist < min_dist) {
                     min_dist = dist;
-                    connections[i].a = points[j];
-                    connections[i].b = points[k];
-                    connections[i].a_idx = j;
-                    connections[i].b_idx = k;
+                    connections[connections_length].a_idx = j;
+                    connections[connections_length].b_idx = k;
+                    prev_x1 = points[j].x;
+                    prev_x2 = points[k].x;
                 }
             }
         }
-        connection_set[connections[i].a_idx + connections[i].b_idx * length] = true;
+        connection_set[connections[connections_length].a_idx + connections[connections_length].b_idx * length] = true;
 
-        printf("%d - %d to %d dist: %f\n", i, connections[i].a_idx,
-               connections[i].b_idx, min_dist);
+        connections_length++;
     }
 
-    memset(visited, 0, sizeof(bool) * length);
-
-    long found;
-
-    long max1 = 0;
-    long max2 = 0;
-    long max3 = 0;
-
-    do {
-        found = find_next_group(connections, visited, length);
-        if (found > max1) {
-            max3 = max2;
-            max2 = max1;
-            max1 = found;
-        } else if (found > max2) {
-            max3 = max2;
-            max2 = found;
-        } else if (found > max3) {
-            max3 = found;
-        }
-        // printf("found: %ld\n", found);
-    } while (found != 0);
-
-    printf("product: %ld\n", max1 * max2 * max3);
+    printf("product: %d\n", prev_x1 * prev_x2);
 }
